@@ -1,6 +1,8 @@
 from django.db import models
 from django.conf import settings
 from django.utils.text import slugify
+from shipping.models  import ShippingAddress 
+
 
 class Product(models.Model):
     """Product model"""
@@ -74,7 +76,8 @@ class Order(models.Model):
     is_paid = models.BooleanField(default=False)
     total = models.DecimalField(max_digits=10, decimal_places=2)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
-
+    shipping_address = models.ForeignKey(ShippingAddress, on_delete=models.SET_NULL, null=True, blank=True)
+   
     def __str__(self):
         return f"Order {self.id} created by {self.user.email}"
 

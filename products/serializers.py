@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from .models import Product, Cart, CartItem, OrderItem, Order
-
+from shipping.serializers import ShippingSerializer
 
 class ProductSerializer(serializers.ModelSerializer):
     """turns products model to json"""
@@ -48,9 +48,9 @@ class OrderItemSerializer(serializers.ModelSerializer):
 class OrderSerializer(serializers.ModelSerializer):
     items = OrderItemSerializer(many=True, read_only=True)
     status = serializers.CharField()  # Display the status choice label
-    
+    shipping_address = ShippingSerializer(many=True)
     class Meta:
         model = Order
         fields = ['id', 'created_at', 'is_paid', 'status', 'total', 'items']
-
+        read_only_fields = ['id', 'craeted_at', ]
 

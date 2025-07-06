@@ -7,6 +7,8 @@ from rest_framework.permissions  import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.decorators import action
 from django.db import transaction
+from shipping.models import ShippingAddress
+
 
 # Create your views here.
 class ProductViewSet(viewsets.ModelViewSet):
@@ -106,6 +108,7 @@ class OrderViewSet(viewsets.ModelViewSet):
     def checkout(self, request):
         """checkout user's cart to order"""
         user = request.user
+        address_id = request.data.get('shipping_address_id')
         # gets the user cart
         try:
             cart = Cart.objects.get(user=user)
@@ -117,7 +120,13 @@ class OrderViewSet(viewsets.ModelViewSet):
         if not cart_items:
             return Response({'error':'Cart is empty'}, status=status.HTTP_400_BAD_REQUEST)
         
-        order = Order.objects.create(user=user, total=0)
+
+        try:
+            address = ShippingAddress.objects.get(id=address_id, user=user)
+        except ShippingAddress.DoesNotExist:
+            return Response({'error':'Invalid shipping address'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        order = Order.objects.create(user=user, shipping_address=address, total=0)
         total_price = 0
 
         # changes the cart items to order items for each 
@@ -159,4 +168,3 @@ class OrderViewSet(viewsets.ModelViewSet):
         order.status = order_status
         order.save()
         return Response({'message':f'Order {order.id} status updated successfully'})
-    
