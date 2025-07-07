@@ -1,6 +1,6 @@
 from django.shortcuts import render
 from .models import Product, Cart, CartItem, Order, OrderItem
-from .serializers import ProductSerializer, CartSerializer, OrderSerializer
+from .serializers import ProductSerializer, CartSerializer, OrderSerializer, OrderItemSerializer
 from .permissions import IsVendorUser
 from rest_framework import viewsets, permissions, status
 from rest_framework.permissions  import IsAuthenticated 
@@ -8,7 +8,6 @@ from rest_framework.response import Response
 from rest_framework.decorators import action
 from django.db import transaction
 from shipping.models import ShippingAddress
-
 
 # Create your views here.
 class ProductViewSet(viewsets.ModelViewSet):
@@ -94,6 +93,29 @@ class CartViewSet(viewsets.ModelViewSet):
         except CartItem.DoesNotExist:
             return Response({'error':'Item not found in cart'}, status=status.HTTP_404_NOT_FOUND)
         
+class OrderItemViewSet(viewsets.ModelViewSet):
+    """order viewset"""
+    permission_classes = [IsAuthenticated]
+    serializer_class = OrderItemSerializer
+    def get_queryset(self):
+        """gets user orders"""
+        return OrderItem.objects.filter(product__vendor=self.request.user)
+    
+    @action(detail=True, methods=['post'], url_path='update-item=status')
+    def update_item_status(self, request, pk=None):
+        """update the order item status of the product"""
+        order_item = self.get_object() # gets the model object
+
+        if not request.user.is_staff and not order_item.filter(product__vendor=request.user).exists():
+            return Response({"error":"You are not authorised to do this"}, status=status.HTTP_404_NOT_FOUND)
+        order_status = request.data.get('status')
+        if order_status not in dict(OrderItem.STATUS_CHOICES):
+            return Response({'error':'Invalid order status choice'}, status=status.HTTP_400_BAD_REQUEST)
+        order_item.status = order_status
+        order_item.save()
+        return Response({'message':f'Order item {order_item.id} status updated successfully'})
+    
+    
 
 class OrderViewSet(viewsets.ModelViewSet):
     """order viewset"""

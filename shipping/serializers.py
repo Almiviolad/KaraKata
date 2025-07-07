@@ -3,7 +3,7 @@ from .models import ShippingAddress
 
 class ShippingSerializer(serializers.ModelSerializer):
 
-    class meta:
+    class Meta:
         model = ShippingAddress
         fields = '__all__'
         read_only_fields = ['id', 'created_at', 'user']

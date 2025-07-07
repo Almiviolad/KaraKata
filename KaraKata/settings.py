@@ -143,7 +143,7 @@ REST_FRAMEWORK = {
 
 #simple jwt config
 SIMPLE_JWT = {
-    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=5),
+    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=100000000), #change later
     'REFRESH_TOKEN_LIFETIME': timedelta(days=1),
     'AUTH_HEADER_TYPES': ('Bearer',),
 }
