@@ -2,6 +2,8 @@ from rest_framework import serializers
 from .models import Product, Cart, CartItem, OrderItem, Order
 from shipping.serializers import ShippingSerializer
 from shipping.models import ShippingAddress
+from shipping.serializers import ShippingSerializer
+
 class ProductSerializer(serializers.ModelSerializer):
     """turns products model to json"""
     class Meta:
@@ -44,13 +46,32 @@ class OrderItemSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = OrderItem
-        fields = ['id', 'product', 'quantity', 'price', 'status']
+        fields = ['id', 'product', 'quantity', 'price', 'status', 'vendor']
+        read_only_fields = ['id', 'product', 'vendor']
+
+class VendorOrderItemSerializer(serializers.ModelSerializer):
+    product = serializers.StringRelatedField(source='product.name', read_only=True)
+
+    class Meta:
+        model = OrderItem
+        fields = ['id', 'product', 'quantity', 'price', 'status', 'vendor']
+        read_only_fields = ['id', 'product', 'vendor']
 
 class OrderSerializer(serializers.ModelSerializer):
-    items = OrderItemSerializer(many=True, read_only=True)
+    items = VendorOrderItemSerializer(many=True, read_only=True)
     status = serializers.CharField()  # Display the status choice label
-    shipping_address = serializers.PrimaryKeyRelatedField(queryset=ShippingAddress.objects.all())
+    shipping_address = ShippingSerializer(read_only=True)  # Use the ShippingSerializer for address details
+
     class Meta:
         model = Order
         fields = ['id', 'created_at', 'is_paid', 'status', 'total', 'items', 'shipping_address']
         read_only_fields = ['id', 'created_at', 'status']
+
+
+class VendorOrderSerializer(serializers.Serializer):
+    order_id = serializers.IntegerField()
+    customer = serializers.EmailField()
+    created_at = serializers.DateTimeField(format="%Y-%m-%d %H:%M:%S", read_only=True)
+    order_status = serializers.CharField()
+    items = VendorOrderItemSerializer(many=True, read_only=True)
+    shipping_address = ShippingSerializer()

@@ -1,11 +1,12 @@
 from django.shortcuts import render
 from .models import Product, Cart, CartItem, Order, OrderItem
-from .serializers import ProductSerializer, CartSerializer, OrderSerializer, OrderItemSerializer
+from .serializers import ProductSerializer, CartSerializer, OrderSerializer, OrderItemSerializer, VendorOrderItemSerializer, VendorOrderSerializer
 from .permissions import IsVendorUser
 from rest_framework import viewsets, permissions, status
 from rest_framework.permissions  import IsAuthenticated 
 from rest_framework.response import Response
 from rest_framework.decorators import action
+from rest_framework.views import APIView
 from django.db import transaction
 from shipping.models import ShippingAddress
 
@@ -101,7 +102,7 @@ class OrderItemViewSet(viewsets.ModelViewSet):
         """gets user orders"""
         return OrderItem.objects.filter(product__vendor=self.request.user)
     
-    @action(detail=True, methods=['post'], url_path='update-item=status')
+    @action(detail=True, methods=['post'], url_path='update-item-status')
     def update_item_status(self, request, pk=None):
         """update the order item status of the product"""
         order_item = self.get_object() # gets the model object
@@ -156,7 +157,7 @@ class OrderViewSet(viewsets.ModelViewSet):
             subtotal = item.quantity * item.price
             total_price += subtotal
 
-            OrderItem.objects.create(order=order, product=item.product, quantity=item.quantity, price=item.price)
+            OrderItem.objects.create(order=order, product=item.product, quantity=item.quantity, price=item.price, vendor=item.product.vendor, status='pending')
         order.total = total_price
         order.save()
  
@@ -190,3 +191,39 @@ class OrderViewSet(viewsets.ModelViewSet):
         order.status = order_status
         order.save()
         return Response({'message':f'Order {order.id} status updated successfully'})
+    
+class vendorDashboardView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        vendor_items = OrderItem.objects.filter(vendor=request.user).select_related('order', 'quantity', 'price', 'product', 'order__user')
+
+        order_map = {}
+
+        for item in vendor_items:
+            order = item.order
+            quantity = item.quantity
+            price = item.price
+            
+            if order.id not in order_map:
+                order_map[order.id] = {
+                    'order_id': order.id,
+                    'customer': order.user.email,
+                    'order_status': order.status,
+                    'quantity': quantity,
+                    'price':price,
+                    'created_at': order.created_at,
+                    'shipping_address': order.shipping_address,
+                    'items': []
+                }
+            order_map[order.id]['items'].append(item) # adds vendor items tothe item array in order
+
+        response_data = []
+        for order_data in order_map.values():
+            item_serializer = VendorOrderItemSerializer(order_data['items'], many=True)
+            order_data['items'] = item_serializer.data
+
+            order_data = VendorOrderSerializer(order_data)
+
+            response_data.append(order_data.data)
+            return (response_data)
