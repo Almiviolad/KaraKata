@@ -9,6 +9,7 @@ from rest_framework.decorators import action
 from rest_framework.views import APIView
 from django.db import transaction
 from shipping.models import ShippingAddress
+from django.utils import timezone
 
 # Create your views here.
 class ProductViewSet(viewsets.ModelViewSet):
@@ -192,19 +193,20 @@ class OrderViewSet(viewsets.ModelViewSet):
         order.save()
         return Response({'message':f'Order {order.id} status updated successfully'})
     
-class vendorDashboardView(APIView):
+class VendorDashboardView(APIView):
+    """vENDOR DASHBOARD VIEW"""
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        vendor_items = OrderItem.objects.filter(vendor=request.user).select_related('order', 'quantity', 'price', 'product', 'order__user')
-
+        vendor_items = OrderItem.objects.filter(vendor=request.user, order__is_paid=True).select_related('order','product', 'order__user')
+        print(vendor_items)
         order_map = {}
 
         for item in vendor_items:
             order = item.order
             quantity = item.quantity
             price = item.price
-            
+
             if order.id not in order_map:
                 order_map[order.id] = {
                     'order_id': order.id,
@@ -226,4 +228,43 @@ class vendorDashboardView(APIView):
             order_data = VendorOrderSerializer(order_data)
 
             response_data.append(order_data.data)
-            return (response_data)
+        return Response({'orders': response_data}, status=status.HTTP_200_OK)
+# To Do: implement order total and total earnng forvendor
+
+class InitPaymentView(APIView):
+    """Initialise payment"""
+    permission_classes = [IsAuthenticated]
+    
+    def post(self, request, order_id):
+        """gets order create new payment"""
+        try:
+            order = Order.objects.get(id=order_id, user=request.user)
+            if order.is_paid:
+                return Response({'message': 'Order already paid'}, status=400)
+            
+            # Fake transcatiomn ref we later generate from paysatck init call
+            fake_ref = f"txn_{order_id}_{timezone.now().timestamp()}"
+            order.payment_reference = fake_ref
+            order.save()
+
+            # when addinfg payment return redirectt url
+            return Response({"message":"Payment initialized succesfully", "reference":fake_ref, "amount":order.total, "callback_url":f"http://localhost:8000/api/{order.id}/verify-payment/"})
+        except Order.DoesNotExist:
+            return Response({"error":"Order not found"}, status=404)
+
+class VerifyPaymentView(APIView):
+    """verify payment (simulated for now)"""
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, order_id):
+        """gets order and verify payment"""
+        try:
+            order = Order.objects.get(id=order_id, user=request.user)
+            if not order.is_paid:
+                #add real payment api call later
+                order.is_paid = True
+                order.paid_at = timezone.now()
+                order.save()
+            return Response({'message': 'Payment verified successfully'}, status=status.HTTP_200_OK)
+        except Order.DoesNotExist:
+            return Response({'error':'Order not found'}, status=404)
