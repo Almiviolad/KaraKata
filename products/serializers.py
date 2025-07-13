@@ -58,7 +58,7 @@ class VendorOrderItemSerializer(serializers.ModelSerializer):
         read_only_fields = ['id', 'product', 'vendor']
 
 class OrderSerializer(serializers.ModelSerializer):
-    items = VendorOrderItemSerializer(many=True, read_only=True)
+    items = OrderItemSerializer(many=True, read_only=True)
     status = serializers.CharField()  # Display the status choice label
     shipping_address = ShippingSerializer(read_only=True)  # Use the ShippingSerializer for address details
 

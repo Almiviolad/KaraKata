@@ -100,7 +100,7 @@ class OrderItemViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
     serializer_class = OrderItemSerializer
     def get_queryset(self):
-        """gets user orders"""
+        """gets vendors orders"""
         return OrderItem.objects.filter(product__vendor=self.request.user)
     
     @action(detail=True, methods=['post'], url_path='update-item-status')
@@ -117,7 +117,19 @@ class OrderItemViewSet(viewsets.ModelViewSet):
         order_item.save()
         return Response({'message':f'Order item {order_item.id} status updated successfully'})
     
+    @action(detail=True, methods=['post'], url_path='update_delivery')
+    def update_is_delivered(self, request, pk=None):
+        """Update delivery status"""
+        order_item = self.get_object() # gets the model object
+
+        if not request.user.is_staff and not order_item.filter(product__vendor=request.user).exists():
+            return Response({"error":"You are not authorised to do this"}, status=status.HTTP_404_NOT_FOUND)
+        is_delivered = request.data.get('is_delivered')
+        order_item.is_delivered = is_delivered
+        order_item.save()
+        return Response({'message':f'Order item {order_item.id} delivery status updated successfully'})
     
+        
 
 class OrderViewSet(viewsets.ModelViewSet):
     """order viewset"""
@@ -146,7 +158,7 @@ class OrderViewSet(viewsets.ModelViewSet):
         
 
         try:
-            address = ShippingAddress.objects.get(id=address_id, user=user)
+             address = ShippingAddress.objects.get(id=address_id, user=user)
         except ShippingAddress.DoesNotExist:
             return Response({'error':'Invalid shipping address'}, status=status.HTTP_400_BAD_REQUEST)
         
@@ -265,6 +277,11 @@ class VerifyPaymentView(APIView):
                 order.is_paid = True
                 order.paid_at = timezone.now()
                 order.save()
+            for item in order.items.all():
+                item.product.stock -= item.quantity
+                item.product.save()
+            # call the payment gateway API to verify the payment
+
             return Response({'message': 'Payment verified successfully'}, status=status.HTTP_200_OK)
         except Order.DoesNotExist:
             return Response({'error':'Order not found'}, status=404)
