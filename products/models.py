@@ -1,7 +1,17 @@
 from django.db import models
 from django.conf import settings
 from django.utils.text import slugify
-from shipping.models  import ShippingAddress 
+from shipping.models  import ShippingAddress
+
+
+
+class Category(models.Model):
+    """Products categories"""
+    name = models.CharField(max_length=100)
+    slug = models.SlugField(unique=True)
+
+    def __str__(self):
+        return self.name
 
 
 class Product(models.Model):
@@ -19,6 +29,7 @@ class Product(models.Model):
     image = models.ImageField(upload_to='products/', blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
     stock = models.PositiveIntegerField(default=0)
+    category = models.ForeignKey(Category, on_delete=models.CASCADE, related_name='products', null=True, blank=True)
 
     def save(self, *args, **kwargs):
         """creates slug for products before saving"""
@@ -82,9 +93,10 @@ class Order(models.Model):
     total = models.DecimalField(max_digits=10, decimal_places=2)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
     shipping_address = models.ForeignKey(ShippingAddress, on_delete=models.SET_NULL, null=True, blank=True)
-   
+    cancelled = models.BooleanField(default=False)
     def __str__(self):
         return f"Order {self.id} created by {self.user.email}"
+
 
 class OrderItem(models.Model):
     STATUS_CHOICES = [('pending', 'Pending'), ('processing', 'Processing'), ('shipped', 'Shipped'), ('delivered','Delivered'), ('cancelled', 'Cancelled')]

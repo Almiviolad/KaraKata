@@ -1,6 +1,6 @@
 from django.shortcuts import render
-from .models import Product, Cart, CartItem, Order, OrderItem
-from .serializers import ProductSerializer, CartSerializer, OrderSerializer, OrderItemSerializer, VendorOrderItemSerializer, VendorOrderSerializer
+from .models import Product, Cart, CartItem, Order, OrderItem, Category
+from .serializers import ProductSerializer, CartSerializer, OrderSerializer, OrderItemSerializer, VendorOrderItemSerializer, VendorOrderSerializer, CategorySerializer
 from .permissions import IsVendorUser
 from rest_framework import viewsets, permissions, status
 from rest_framework.permissions  import IsAuthenticated 
@@ -10,6 +10,7 @@ from rest_framework.views import APIView
 from django.db import transaction
 from shipping.models import ShippingAddress
 from django.utils import timezone
+from filters import ProductFilter
 
 # Create your views here.
 class ProductViewSet(viewsets.ModelViewSet):
@@ -17,7 +18,8 @@ class ProductViewSet(viewsets.ModelViewSet):
     queryset = Product.objects.all()
     serializer_class = ProductSerializer
     look_up_field = 'slug'
-    filterset_fiels = ['price', 'vendor']
+    filterset_fields = ['category', 'vendor']
+    filterset_class = ProductFilter
     search_fields = ['name', 'description']
     ordering_fields = ['price', 'created_at']
     
@@ -126,6 +128,7 @@ class OrderItemViewSet(viewsets.ModelViewSet):
             return Response({"error":"You are not authorised to do this"}, status=status.HTTP_404_NOT_FOUND)
         is_delivered = request.data.get('is_delivered')
         order_item.is_delivered = is_delivered
+
         order_item.save()
         return Response({'message':f'Order item {order_item.id} delivery status updated successfully'})
     
@@ -173,7 +176,7 @@ class OrderViewSet(viewsets.ModelViewSet):
             OrderItem.objects.create(order=order, product=item.product, quantity=item.quantity, price=item.price, vendor=item.product.vendor, status='pending')
         order.total = total_price
         order.save()
- 
+        
         # clears the cart
         cart.items.all().delete()
 
@@ -205,6 +208,27 @@ class OrderViewSet(viewsets.ModelViewSet):
         order.save()
         return Response({'message':f'Order {order.id} status updated successfully'})
     
+
+    @action(detail=True, methods=['post'], url_path='cancel')
+    def cancel(self, request, pk=None):
+        """cancel the delivery"""
+        try:
+            order = self.get_object() # gets the model object
+        except Order.DoesNotExist:
+            return Response({"error":"Order not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        if not request.user == order.user:
+            return Response({"error: You are unauthorised to cancel this order"}, status=status.HTTP_401_UNAUTHORIZED)
+        if order.is_paid:
+            return Response({"error":"Cannot cancel a paid order"}, status=status.HTTP_400_BAD_REQUEST)
+        if order.cancelled:
+            return Response({"error":"Order already cancelled"}, status=status.HTTP_400_BAD_REQUEST)
+        order.cancelled = True
+        order.cancelled_at = timezone.now()
+        order.save()
+        return Response({"message":"Order cancelled successfully"})
+
+
 class VendorDashboardView(APIView):
     """vENDOR DASHBOARD VIEW"""
     permission_classes = [IsAuthenticated]
@@ -243,6 +267,7 @@ class VendorDashboardView(APIView):
         return Response({'orders': response_data}, status=status.HTTP_200_OK)
 # To Do: implement order total and total earnng forvendor
 
+#payment viewss
 class InitPaymentView(APIView):
     """Initialise payment"""
     permission_classes = [IsAuthenticated]
@@ -285,3 +310,8 @@ class VerifyPaymentView(APIView):
             return Response({'message': 'Payment verified successfully'}, status=status.HTTP_200_OK)
         except Order.DoesNotExist:
             return Response({'error':'Order not found'}, status=404)
+        
+class CategoryViewset(viewsets.ModelViewSet):
+    permission_classes = [IsAuthenticated]
+    serializer_class = CategorySerializer
+    queryset = Category.objects.all()

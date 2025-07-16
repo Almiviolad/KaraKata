@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Product, Cart, CartItem, OrderItem, Order
+from .models import Product, Cart, CartItem, OrderItem, Order, Category
 from shipping.serializers import ShippingSerializer
 from shipping.models import ShippingAddress
 from shipping.serializers import ShippingSerializer
@@ -46,7 +46,7 @@ class OrderItemSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = OrderItem
-        fields = ['id', 'product', 'quantity', 'price', 'status', 'vendor']
+        fields = ['id', 'product', 'quantity', 'price', 'status', 'vendor', 'is_delivered']
         read_only_fields = ['id', 'product', 'vendor']
 
 class VendorOrderItemSerializer(serializers.ModelSerializer):
@@ -64,7 +64,7 @@ class OrderSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Order
-        fields = ['id', 'created_at', 'is_paid', 'status', 'total', 'items', 'shipping_address']
+        fields = ['id', 'created_at', 'is_paid', 'status', 'total', 'items', 'shipping_address', 'cancelled']
         read_only_fields = ['id', 'created_at', 'status']
 
 
@@ -75,3 +75,10 @@ class VendorOrderSerializer(serializers.Serializer):
     order_status = serializers.CharField()
     items = VendorOrderItemSerializer(many=True, read_only=True)
     shipping_address = ShippingSerializer()
+
+class CategorySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Category
+        fields = "__all__"
+
+
