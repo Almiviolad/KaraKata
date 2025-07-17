@@ -10,7 +10,7 @@ from rest_framework.views import APIView
 from django.db import transaction
 from shipping.models import ShippingAddress
 from django.utils import timezone
-from filters import ProductFilter
+from .filters import ProductFilter
 
 # Create your views here.
 class ProductViewSet(viewsets.ModelViewSet):
